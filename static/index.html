@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <title>To-Do App</title>
+  <style>
+    body { font-family: system-ui, sans-serif; max-width: 400px; margin: 40px auto; padding: 20px; }
+    .input-container { display: flex; gap: 8px; margin-bottom: 20px; }
+    input { flex: 1; padding: 10px; border: 1px solid #ccc; border-radius: 4px; }
+    button { padding: 10px 14px; background: #0066cc; color: white; border: none; border-radius: 4px; cursor: pointer; }
+    ul { list-style: none; padding: 0; }
+    li { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
+    .delete-btn { background: #e63946; }
+  </style>
+</head>
+<body>
+  <h2>To-Do List</h2>
+  <div class="input-container">
+    <input type="text" id="taskInput" placeholder="Add a task...">
+    <button onclick="addTask()">Add</button>
+  </div>
+  <ul id="taskList"></ul>
+
+  <script>
+    const API = '/api/tasks';
+
+    async function fetchTasks() {
+      const res = await fetch(API);
+      const data = await res.json();
+      const list = document.getElementById('taskList');
+      list.innerHTML = data.map(t => `
+        <li>
+          <span>${t.text}</span>
+          <button class="delete-btn" onclick="deleteTask(${t.id})">Delete</button>
+        </li>
+      `).join('');
+    }
+
+    async function addTask() {
+      const input = document.getElementById('taskInput');
+      if (!input.value.trim()) return;
+      await fetch(API, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: input.value.trim() })
+      });
+      input.value = '';
+      fetchTasks();
+    }
+
+    async function deleteTask(id) {
+      await fetch(`${API}/${id}`, { method: 'DELETE' });
+      fetchTasks();
+    }
+
+    fetchTasks();
+  </script>
+</body>
+</html>
