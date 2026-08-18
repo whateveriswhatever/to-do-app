@@ -130,23 +130,22 @@ def delete_task(task_id: int):
 
 
 @app.post("/api/users/login")
-def login(payload: LoginRequest):
-    for user in clone_user_accs["users"]:
-        if user["username"] == payload.username:
-            if user["password"] == payload.password:
-                response = RedirectResponse(
-                    url="/", status_code=status.HTTP_303_SEE_OTHER
-                );
-                response.set_cookie(
-                    key="logged_in", value="true", httponly=True
-                );
-                return response;
-            else:
-                raise HTTPException(
-                    status_code=401, detail="Wrong password!"
-                );
+def login(payload: LoginRequest, db: Session = Depends(get_db)):
+    existing_user = db.query(UserDB).filter(UserDB.username == payload.username).first();
+    if not existing_user:
+        raise HTTPException(
+            status_code=404, detail="User not found";
+        );
+    if existing_user.password != payload.password:
+        raise HTTException(status_code=401, detail="Wrong password!");
 
-    raise HTTPException(status_code=404, detail="User not found!");
+    response = RedirectResponse(
+        url="/", status_code=status.HTTP_303_SEE_OTHER
+    );
+    response.set_cookie(
+        key="logged_in", value="true", httponly=True
+    );
+    return response;
 
 @app.post("/api/users/signup")
 def signup(payload: SignupRequest, db: Session = Depends(get_db)):
