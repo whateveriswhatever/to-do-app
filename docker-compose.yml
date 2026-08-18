@@ -6,4 +6,4 @@ services:
     ports:
       - "8080:8080"
     environment:
-      - DATABASE_URL=postgresql://admin:DitcumayCMC1@postgres_db:5432/todo_db
+      - DATABASE_URL=postgresql://admin:DitcumayCMC1@172.16.69.198:5432:5432/todo_db
