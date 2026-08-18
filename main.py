@@ -145,7 +145,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     response.set_cookie(
         key="logged_in", value="true", httponly=True
     );
-    response.set_cookie(key="username", value=user.username);
+    response.set_cookie(key="username", value=existing_user.username);
     return response;
 
 @app.post("/api/users/signup")
