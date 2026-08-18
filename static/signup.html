@@ -58,6 +58,10 @@
             <div>
                 <button type="submit">Register</button>
             </div>
+            <div>
+                <p>Have an account? </p>
+                <a href="/login">Login</a>
+            </div>
         </form>
     </body>
 
@@ -82,6 +86,7 @@
                 headers: {"Content-Type": "application/json"},
                 body: JSON.stringify(data)
             });
+            const contentType = response.headers.get("content-type");
             const result = await response.json();
             if (response.ok) {
                 alert("Registered successfully!");

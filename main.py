@@ -145,6 +145,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     response.set_cookie(
         key="logged_in", value="true", httponly=True
     );
+    response.set_cookie(key="username", value=user.username);
     return response;
 
 @app.post("/api/users/signup")
@@ -167,5 +168,26 @@ def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     db.commit();
     db.refresh(new_user);
     return {"message": "Created a new account!", "userID": new_user.id};
+
+@app.get("/api/users/me")
+def get_current_user(request: Request, db: Session = Depends(get_db)):
+    username = request.cookies.get("username");
+    if not username:
+        raise HTTPException(status_code=401, detail="Not authenticated");
+    user = db.query(UserDB).filter(UserDB.username == username).first();
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found!");
+    return {
+        "username": user.username,
+        "firstname": user.firstname,
+        "lastname": user.lastname
+    };
+
+@app.post("/api/users/logout")
+def logout():
+    response = RedirectResponse(url="/login", status_code=status.HTTP_303_SEE_OTHER);
+    response.delete_cookie("logged_in");
+    response.delete_cookie("username");
+    return response;
 
     

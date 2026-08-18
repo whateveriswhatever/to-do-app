@@ -11,9 +11,23 @@
     ul { list-style: none; padding: 0; }
     li { display: flex; justify-content: space-between; align-items: center; padding: 10px; border-bottom: 1px solid #eee; }
     .delete-btn { background: #e63946; }
+
+    .user-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: #f0f4f8;
+      padding: 10px 14px;
+      border-radius: 6px;
+      margin-bottom: 20px;
+    }
+    .logout-btn { background: #6c757d; font-size: 13px; padding: 6px 10px; }
   </style>
 </head>
 <body>
+  <div id="user">
+
+  </div>
   <h2>To-Do List</h2>
   <div class="input-container">
     <input type="text" id="taskInput" placeholder="Add a task...">
@@ -23,6 +37,26 @@
 
   <script>
     const API = '/api/tasks';
+
+    async function fetchUser() {
+      try {
+        const res = await fetch("/api/users/me");
+        if (res.ok) {
+          const user = await res.json();
+          const displayName = user.firstname ? `${user.firstname} ${user.lastname}` : user["username"];
+          document.getElementById("user").innerHTML = `
+            <div class="user-bar">
+              <span>
+                <strong>${displayName}</strong>
+              </span>
+              <button class="logout-btn" onclick="logout()">Log out</button>
+            </div>
+          `;
+        }
+      } catch (err) {
+        console.error(`Can't retrieve the user information! ${err}`);
+      }
+    }
 
     async function fetchTasks() {
       const res = await fetch(API);
@@ -53,6 +87,12 @@
       fetchTasks();
     }
 
+    async function logout() {
+      await fetch("/api/users/logout", {method: "POST"});
+      window.location.href = "/login";
+    }
+
+    fetchUser();
     fetchTasks();
   </script>
 </body>
