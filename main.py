@@ -134,7 +134,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     existing_user = db.query(UserDB).filter(UserDB.username == payload.username).first();
     if not existing_user:
         raise HTTPException(
-            status_code=404, detail="User not found";
+            status_code=404, detail="User not found"
         );
     if existing_user.password != payload.password:
         raise HTTException(status_code=401, detail="Wrong password!");
