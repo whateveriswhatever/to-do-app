@@ -1,0 +1,63 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Signup</title>
+    </head>
+
+    <body>
+        <h1>Signup a new account</h1>
+
+        <form id="signup-form" action="/api/users/signup" method="post">
+            <div id="user-detailed-info">
+                <div id="">
+                    <input type="text" name="firstname" placeholder="First name" />
+                </div>
+
+                <div>
+                    <input type="text" name="lastname" placeholder="Last name"/>
+                </div>
+
+                <div>
+                    <input type="number" name="age" placeholder="Age" />
+                </div>
+
+                <div>
+                    <label for="nationality">Nationality</label>
+                    <select id="nationality" name="nationality" required>
+                        <option value="USA">United States</option>
+                        <option value="ITA">Italy</option>
+                        <option value="GBR">United Kingdoms</option>
+                        <option value="VNM">Vietnam</option>
+                        <option value="DEU">Germany</option>
+                        <option value="AUS">Australia</option>
+                        <option value="CAN">Canada</option>
+                        <option value="JPN">Japan</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label for="gender">Gender</label>
+                    <select id="gender" name="gender" required>
+                        <option value=0>Male</option>
+                        <option value=1>Female</option>
+                    </select>
+                </div>
+            </div>
+        
+            <div id="user-acc">
+                <div>
+                    <p>Username:</p>
+                    <input type="text" required placeholder="Username" />
+                </div>
+                <div>
+                    <p>Password:</p>
+                    <input type="password" required placeholder="Password" />
+                </div>
+            </div>
+
+            <div>
+                <button type="submit">Register</button>
+            </div>
+        </form>
+    </body>
+</html>

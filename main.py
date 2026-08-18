@@ -1,8 +1,38 @@
 from typing import List
-from fastapi import FastAPI, HTTPException, Request, status
+from fastapi import FastAPI, HTTPException, Request, status, Depends
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
+from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import sessionmaker, Session
+import os
+
+DB_URL = os.getenv("DATABASE_URL");
+engine = create_engine(DB_URL);
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine);
+Base = declarative_base();
+
+class UserDB(Base):
+    __tablename__ = "users";
+    id = Column(Integer, primary_key=True, index=True);
+    fristname = Column(String);
+    lastname = Column(String);
+    age = Column(Integer);
+    nationality = Column(String);
+    gender = Column(Integer);
+    username = Column(String, unique=True, index=True);
+    password = Column(String);
+
+Base.metadata.create_all(bind=engine);
+
+# Dependency to get DB session
+def get_db():
+    db = SessionLocal();
+    try:
+        yield db;
+    finally:
+        db.close();
 
 app = FastAPI()
 
@@ -23,6 +53,15 @@ class LoginRequest(BaseModel):
     username: str
     password: str
 
+class SignupRequest(BaseModel):
+    firstname: str
+    lastname: str
+    age: int
+    nationality: str
+    gender: int
+    username: str
+    password: str
+
 
 tasks: List[Task] = []
 task_id_counter = 1
@@ -35,6 +74,7 @@ async def authentication_middleware(request: Request, call_next):
     if (
         path == "/login"
         or path.startswith("/api/users/login")
+        or path.startswith("/api/users/register")
         or path.startswith("/static")
     ):
         return await call_next(request)
@@ -57,6 +97,10 @@ def serve_index():
 @app.get("/login")
 def serve_login():
     return FileResponse("static/login.html")
+
+@app.get("/signup")
+def serve_signup():
+    return FileResponse("static/signup.html");
 
 
 # Mount static directory to /static so assets (e.g., /static/style.css) bypass auth cleanly
@@ -91,14 +135,37 @@ def login(payload: LoginRequest):
             if user["password"] == payload.password:
                 response = RedirectResponse(
                     url="/", status_code=status.HTTP_303_SEE_OTHER
-                )
+                );
                 response.set_cookie(
                     key="logged_in", value="true", httponly=True
-                )
-                return response
+                );
+                return response;
             else:
                 raise HTTPException(
                     status_code=401, detail="Wrong password!"
-                )
+                );
 
-    raise HTTPException(status_code=404, detail="User not found!")
+    raise HTTPException(status_code=404, detail="User not found!");
+
+@app.post("/api/users/register")
+def signup(payload: SignupRequest, db: Session = Depends(get_db)):
+    existing_user = db.query(UserDB).filter(UserDB.username == payload.username).first();
+    if existing_user:
+        raise HTTPException(status_code=400, detail="Username is already exist!");
+    
+    new_user = UserDB(
+        firstname=payload.firstname,
+        lastname=payload.lastname,
+        age=payload.age,
+        nationality=payload.nationality,
+        gender=payload.gender,
+        username=payload.username,
+        password=payload.password
+    );
+
+    db.add(new_user);
+    db.commit();
+    db.refresh(new_user);
+    return {"message": "Created a new account!", "userID": new_user.id};
+
+    
