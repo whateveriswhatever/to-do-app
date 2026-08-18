@@ -16,7 +16,7 @@ Base = declarative_base();
 class UserDB(Base):
     __tablename__ = "users";
     id = Column(Integer, primary_key=True, index=True);
-    fristname = Column(String);
+    firstname = Column(String);
     lastname = Column(String);
     age = Column(Integer);
     nationality = Column(String);
@@ -73,8 +73,9 @@ async def authentication_middleware(request: Request, call_next):
     # Allow login endpoints and the /static directory without authentication
     if (
         path == "/login"
+        or path == "/signup"
         or path.startswith("/api/users/login")
-        or path.startswith("/api/users/register")
+        or path.startswith("/api/users/signup")
         or path.startswith("/static")
     ):
         return await call_next(request)
@@ -147,7 +148,7 @@ def login(payload: LoginRequest):
 
     raise HTTPException(status_code=404, detail="User not found!");
 
-@app.post("/api/users/register")
+@app.post("/api/users/signup")
 def signup(payload: SignupRequest, db: Session = Depends(get_db)):
     existing_user = db.query(UserDB).filter(UserDB.username == payload.username).first();
     if existing_user:
