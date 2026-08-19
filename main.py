@@ -7,11 +7,31 @@ from sqlalchemy import create_engine, Column, Integer, String
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 import os
+import random
 
 DB_URL = os.getenv("DATABASE_URL");
+READ_DB_URLS = [
+    os.getenv("READ_DB_URL_1"),
+    os.getenv("READ_DB_URL_2")
+];
+WRITE_DB_URL = os.getenv("WRITE_DB_URL");
+
 engine = create_engine(DB_URL);
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine);
 Base = declarative_base();
+
+write_engine = create_engine(
+    WRITE_DB_URL,
+    pool_size=10,
+    max_overflow=20
+);
+read_engine = create_engine(
+    random.choice(READ_DB_URLS),
+    pool_size=10,
+    max_overflow=20
+);
+WriteSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=write_engine);
+ReadSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=read_engine);
 
 class UserDB(Base):
     __tablename__ = "users";
@@ -29,6 +49,20 @@ Base.metadata.create_all(bind=engine);
 # Dependency to get DB session
 def get_db():
     db = SessionLocal();
+    try:
+        yield db;
+    finally:
+        db.close();
+
+def get_writeDB():
+    db = WriteSessionLocal();
+    try:
+        yield db;
+    finally:
+        db.close();
+
+def get_readDB():
+    db = ReadSessionLocal();
     try:
         yield db;
     finally:
@@ -130,7 +164,7 @@ def delete_task(task_id: int):
 
 
 @app.post("/api/users/login")
-def login(payload: LoginRequest, db: Session = Depends(get_db)):
+def login(payload: LoginRequest, db: Session = Depends(get_readDB)):
     existing_user = db.query(UserDB).filter(UserDB.username == payload.username).first();
     if not existing_user:
         raise HTTPException(
@@ -149,7 +183,7 @@ def login(payload: LoginRequest, db: Session = Depends(get_db)):
     return response;
 
 @app.post("/api/users/signup")
-def signup(payload: SignupRequest, db: Session = Depends(get_db)):
+def signup(payload: SignupRequest, db: Session = Depends(get_writeDB)):
     existing_user = db.query(UserDB).filter(UserDB.username == payload.username).first();
     if existing_user:
         raise HTTPException(status_code=400, detail="Username is already exist!");
