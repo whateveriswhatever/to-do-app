@@ -97,7 +97,6 @@ class TaskCreate(BaseModel):
     content: str;
     order_priority: int;
     is_done: int = 0;
-    account_id: int
 
 class Task(BaseModel):
     id: int;
@@ -196,7 +195,7 @@ def create_task(
     write_db: Session = Depends(get_writeDB),
     read_db: Session = Depends(get_readDB)):
     curr_user = get_current_user_data(request, read_db);
-    new_task = TaskCreate(
+    new_task = NotedTasks(
         content = payload.content,
         order_priority = payload.order_priority,
         is_done = payload.is_done,
@@ -215,7 +214,7 @@ def delete_task(task_id: int, request: Request, write_db: Session = Depends(get_
     curr_user = get_current_user_data(request, read_db);
     task = write_db.query(NotedTasks).filter(
         NotedTasks.id == task_id,
-        NotedTasks.account_id == curr_user["id"]
+        NotedTasks.account_id == curr_user["user_id"]
     ).first();
     if not task:
         raise HTTPException(status_code=404, detail="Desired task is not found!");
