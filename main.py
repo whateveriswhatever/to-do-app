@@ -1,9 +1,9 @@
 from typing import List
-from fastapi import FastAPI, HTTPException, Request, status, Depends
+from fastapi import FastAPI, HTTPException, Request, status, Depends, Cookie
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
-from sqlalchemy import create_engine, Column, Integer, String
+from sqlalchemy import create_engine, Column, Integer, String, ForeignKey
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 import os
@@ -51,6 +51,14 @@ class UserDB(Base):
     username = Column(String, unique=True, index=True);
     password = Column(String);
 
+class NotedTasks(Base):
+    __tablename__ = "tasks";
+    id = Column(Integer, primary_key=True, index=True);
+    order_priority = Column(Integer);
+    content = Column(String);
+    is_done = Column(Integer);
+    account_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"));
+
 Base.metadata.create_all(bind=engine);
 
 # Dependency to get DB session
@@ -85,10 +93,20 @@ clone_user_accs = {
 }
 
 
-class Task(BaseModel):
-    id: int
-    text: str
+class TaskCreate(BaseModel):
+    content: int;
+    order_priority: str;
+    is_done: int = 0;
 
+class Task(BaseModel):
+    id: int;
+    content: str;
+    order_priority: int;
+    is_done: int;
+    account_id: int
+    
+    class Config:
+        from_attribute = True;
 
 class LoginRequest(BaseModel):
     username: str
@@ -107,6 +125,9 @@ class SignupRequest(BaseModel):
 tasks: List[Task] = []
 task_id_counter = 1
 
+@app.get("/read-cookie")
+async def read_cookie(session_id: Optional[str] = Cookie(None)):
+    return {"session_id": session_id};
 
 @app.middleware("http")
 async def authentication_middleware(request: Request, call_next):
@@ -148,25 +169,57 @@ def serve_signup():
 # Mount static directory to /static so assets (e.g., /static/style.css) bypass auth cleanly
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
+def get_current_user_data(request: Request, db: Session):
+    username = request.cookies.get("username");
+    if not username or username == "":
+        raise HTTPException(status_code=401, detail="Not authenticated");
+    user = db.query(UserDB).filter(UserDB.username == username).first();
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found!");
+    return {
+        "username": user.username,
+        "user_id": user.id
+    };
 
 @app.get("/api/tasks", response_model=List[Task])
-def get_task():
-    return tasks
+def get_tasks(request: Request, db: Session = Depends(get_readDB)):
+    curr_user = get_current_user_data(request, db);
+    user_tasks = db.query(NotedTasks).filter(NotedTasks.account_id == curr_user["user_id"]).all(); 
+    return user_tasks;
 
 
 @app.post("/api/tasks", response_model=Task)
-def create_task(payload: dict):
-    global task_id_counter
-    task = Task(id=task_id_counter, text=payload.get("text", ""))
-    tasks.append(task)
-    task_id_counter += 1
-    return task
+def create_task(
+    payload: TaskCreate, 
+    request: Request, 
+    write_db: Session = Depends(get_writeDB),
+    read_db: Session = Depends(get_readDB)):
+    curr_user = get_current_user_data(request, read_db);
+    new_task = TaskCreate(
+        content = payload["content"],
+        order_priority = int(payload["order_priority"]),
+        is_done = int(payload["is_done"]),
+        account_id = int(payload["account_id"])
+    );
+    write_db.add(new_task);
+    write_db.commit();
+    write_db.refresh(new_task);
+    return {"message": "Created a new task!", "user_id": curr_user["id"]};
+
+    
 
 
 @app.delete("/api/tasks/{task_id}")
-def delete_task(task_id: int):
-    global tasks
-    tasks = [t for t in tasks if t.id != task_id]
+def delete_task(request: Request, write_db: Session = Depends(get_writeDB), read_db: Session = Depends(get_readDB), task_id: int):
+    curr_user = get_current_user_data(request, read_db);
+    task = write_db.query(NotedTasks).filter(
+        NotedTasks.id == task_id,
+        NotedTasks.account_id == curr_user["id"]
+    );
+    if not task:
+        raise HTTPException(status_code=404, detail="Desired task is not found!");
+    write_db.delete(task);
+    write_db.commit();
     return {"status": "deleted"}
 
 
