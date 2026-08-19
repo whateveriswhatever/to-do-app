@@ -97,6 +97,7 @@ class TaskCreate(BaseModel):
     content: str;
     order_priority: int;
     is_done: int = 0;
+    account_id: int
 
 class Task(BaseModel):
     id: int;
