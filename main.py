@@ -210,7 +210,7 @@ def create_task(
 
 
 @app.delete("/api/tasks/{task_id}")
-def delete_task(request: Request, write_db: Session = Depends(get_writeDB), read_db: Session = Depends(get_readDB), task_id: int):
+def delete_task(task_id: int, request: Request, write_db: Session = Depends(get_writeDB), read_db: Session = Depends(get_readDB)):
     curr_user = get_current_user_data(request, read_db);
     task = write_db.query(NotedTasks).filter(
         NotedTasks.id == task_id,
