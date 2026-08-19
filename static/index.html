@@ -31,6 +31,7 @@
   <h2>To-Do List</h2>
   <div class="input-container">
     <input type="text" id="taskInput" placeholder="Add a task...">
+    <input type="number" id="priorityInput" placeholder="Priority" style="flex: 0.3;"/>
     <button onclick="addTask()">Add</button>
   </div>
   <ul id="taskList"></ul>
@@ -64,7 +65,7 @@
       const list = document.getElementById('taskList');
       list.innerHTML = data.map(t => `
         <li>
-          <span>${t.text}</span>
+          <span>${t.content}</span>
           <button class="delete-btn" onclick="deleteTask(${t.id})">Delete</button>
         </li>
       `).join('');
@@ -72,13 +73,21 @@
 
     async function addTask() {
       const input = document.getElementById('taskInput');
+      const priorityInput = document.getElementById("priorityInput");
+
       if (!input.value.trim()) return;
       await fetch(API, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text: input.value.trim() })
+        body: JSON.stringify(
+          { content: input.value.trim(),
+            order_priority: parseInt(priorityInput.value) || 0,
+            is_done: 0
+          }
+        )
       });
       input.value = '';
+      priorityInput.value = "";
       fetchTasks();
     }
 

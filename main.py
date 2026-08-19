@@ -196,10 +196,10 @@ def create_task(
     read_db: Session = Depends(get_readDB)):
     curr_user = get_current_user_data(request, read_db);
     new_task = TaskCreate(
-        content = payload["content"],
-        order_priority = int(payload["order_priority"]),
-        is_done = int(payload["is_done"]),
-        account_id = int(payload["account_id"])
+        content = payload.content,
+        order_priority = payload.order_priority,
+        is_done = payload.is_done,
+        account_id = curr_user["user_id"]
     );
     write_db.add(new_task);
     write_db.commit();
@@ -215,7 +215,7 @@ def delete_task(task_id: int, request: Request, write_db: Session = Depends(get_
     task = write_db.query(NotedTasks).filter(
         NotedTasks.id == task_id,
         NotedTasks.account_id == curr_user["id"]
-    );
+    ).first();
     if not task:
         raise HTTPException(status_code=404, detail="Desired task is not found!");
     write_db.delete(task);
