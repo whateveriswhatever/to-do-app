@@ -94,8 +94,8 @@ clone_user_accs = {
 
 
 class TaskCreate(BaseModel):
-    content: int;
-    order_priority: str;
+    content: str;
+    order_priority: int;
     is_done: int = 0;
 
 class Task(BaseModel):
@@ -204,7 +204,7 @@ def create_task(
     write_db.add(new_task);
     write_db.commit();
     write_db.refresh(new_task);
-    return {"message": "Created a new task!", "user_id": curr_user["id"]};
+    return new_task;
 
     
 
