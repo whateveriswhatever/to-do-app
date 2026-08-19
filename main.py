@@ -13,10 +13,14 @@ from dotenv import load_dotenv
 load_dotenv();
 
 DB_URL = os.getenv("DATABASE_URL");
-READ_DB_URLS = [
-    os.getenv("READ_DB_URL_1"),
-    os.getenv("READ_DB_URL_2")
-];
+rep1 = os.getenv("READ_DB_URL_1");
+rep2 = os.getenv("READ_DB_URL_2");
+rep_pool = [rep1, rep2];
+randomly_selected_rep = random.choice(rep_pool);
+if randomly_selected_rep == rep1:
+    print("Replica 1 is being in used");
+else:
+    print("Replica 2 is being in used");
 WRITE_DB_URL = os.getenv("WRITE_DB_URL");
 
 engine = create_engine(DB_URL);
@@ -29,7 +33,7 @@ write_engine = create_engine(
     max_overflow=20
 );
 read_engine = create_engine(
-    random.choice(READ_DB_URLS),
+    randomly_selected_rep,
     pool_size=10,
     max_overflow=20
 );
