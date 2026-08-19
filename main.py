@@ -8,6 +8,9 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import sessionmaker, Session
 import os
 import random
+from dotenv import load_dotenv
+
+load_dotenv();
 
 DB_URL = os.getenv("DATABASE_URL");
 READ_DB_URLS = [

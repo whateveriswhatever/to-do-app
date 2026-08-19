@@ -5,5 +5,5 @@ services:
     build: .
     ports:
       - "8080:8080"
-    environment:
-      - DATABASE_URL=postgresql://admin:DitcumayCMC1@172.16.69.198:5432/todo_db
+    env_file:
+      - .env
