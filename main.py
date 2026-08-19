@@ -125,9 +125,9 @@ class SignupRequest(BaseModel):
 tasks: List[Task] = []
 task_id_counter = 1
 
-@app.get("/read-cookie")
-async def read_cookie(session_id: Optional[str] = Cookie(None)):
-    return {"session_id": session_id};
+# @app.get("/read-cookie")
+# async def read_cookie(session_id: Optional[str] = Cookie(None)):
+#     return {"session_id": session_id};
 
 @app.middleware("http")
 async def authentication_middleware(request: Request, call_next):
