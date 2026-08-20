@@ -9,6 +9,9 @@ from sqlalchemy.orm import sessionmaker, Session
 import os
 import random
 from dotenv import load_dotenv
+from redis_fastapi import FastAPIRedis, AsyncRedisDep
+from redis_init_db import redis_client
+from redis_cache import CacheService
 
 load_dotenv();
 
@@ -61,6 +64,8 @@ class NotedTasks(Base):
 
 Base.metadata.create_all(bind=engine);
 
+FastAPIRedis(app).lifespan();
+
 # Dependency to get DB session
 def get_db():
     db = SessionLocal();
@@ -82,6 +87,13 @@ def get_readDB():
         yield db;
     finally:
         db.close();
+
+# Dependency to get Redis and cache
+async def get_redis() -> Redis:
+    return redis_client.get_client();
+
+async def get_cache(redis: Redis = Depends(get_redis)) -> CacheService:
+    return CacheService(redis);
 
 app = FastAPI()
 
@@ -129,6 +141,11 @@ task_id_counter = 1
 # async def read_cookie(session_id: Optional[str] = Cookie(None)):
 #     return {"session_id": session_id};
 
+@router.get("/cache/{key}")
+async def get_cached_value(key: str, redis: Redis = Depends(get_redis)):
+    value = await redis.get(key);
+    return {"key": key, "value": value};
+
 @app.middleware("http")
 async def authentication_middleware(request: Request, call_next):
     path = request.url.path
@@ -169,49 +186,65 @@ def serve_signup():
 # Mount static directory to /static so assets (e.g., /static/style.css) bypass auth cleanly
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-def get_current_user_data(request: Request, db: Session):
+async def get_current_user_data(request: Request, db: Session, cache: CacheService = Depends(get_cache)):
     username = request.cookies.get("username");
-    if not username or username == "":
+    if not username or username == '':
         raise HTTPException(status_code=401, detail="Not authenticated");
-    user = db.query(UserDB).filter(UserDB.username == username).first();
-    if not user:
+    async def query_user_data_manually():
+        user = db.query(UserDB).filter(UserDB.username == username).first();
+        if not user:
+            return None;
+        return {
+            "username": user.username,
+            "user_id": user.id
+        };
+    
+    user_data = await cache.remember(f"user:account:{username}", 666, query_user_data_manually);
+    if not user_data:
         raise HTTPException(status_code=404, detail="User not found!");
-    return {
-        "username": user.username,
-        "user_id": user.id
-    };
+    return user_data;
 
 @app.get("/api/tasks", response_model=List[Task])
-def get_tasks(request: Request, db: Session = Depends(get_readDB)):
-    curr_user = get_current_user_data(request, db);
-    user_tasks = db.query(NotedTasks).filter(NotedTasks.account_id == curr_user["user_id"]).all(); 
+async def get_tasks(request: Request, db: Session = Depends(get_readDB), curr_user_data: dict = Depends(get_current_user_data), cache: CacheService = Depends(get_cache)):
+    async def query_user_tasks_manually():
+        user_tasks = db.query(NotedTasks).filter(NotedTasks.account_id == curr_user_data["user_id"]).all();
+        return [
+            {
+                "id": task.id,
+                "content": task.content,
+                "order_priority": task.order_priority,
+                "is_done": task.is_done,
+                "account_id": task.account_id
+            }
+            for task in user_tasks
+        ];
+    user_tasks = await cache.remember("user:tasks:{}".format(curr_user_data["user_id"]), 666, query_user_tasks_manually);
     return user_tasks;
 
 
 @app.post("/api/tasks", response_model=Task)
-def create_task(
-    payload: TaskCreate, 
-    request: Request, 
-    write_db: Session = Depends(get_writeDB),
-    read_db: Session = Depends(get_readDB)):
-    curr_user = get_current_user_data(request, read_db);
+async def create_task(
+        payload: TaskCreate, 
+        request: Request, 
+        write_db: Session = Depends(get_writeDB),
+        read_db: Session = Depends(get_readDB),
+        curr_user_data: dict = Depends(get_current_user_data),
+        cache: CacheService = Depends(get_cache)):
     new_task = NotedTasks(
         content = payload.content,
         order_priority = payload.order_priority,
         is_done = payload.is_done,
-        account_id = curr_user["user_id"]
+        account_id = curr_user_data["user_id"]
     );
     write_db.add(new_task);
     write_db.commit();
     write_db.refresh(new_task);
+    await cache.delete("user:tasks:{}".format(curr_user_data["user_id"]));
     return new_task;
-
-    
 
 
 @app.delete("/api/tasks/{task_id}")
-def delete_task(task_id: int, request: Request, write_db: Session = Depends(get_writeDB), read_db: Session = Depends(get_readDB)):
-    curr_user = get_current_user_data(request, read_db);
+async def delete_task(task_id: int, request: Request, write_db: Session = Depends(get_writeDB), read_db: Session = Depends(get_readDB), curr_user_data: dict = Depends(get_current_user_data), cache: CacheService = Depends(get_cache)):
     task = write_db.query(NotedTasks).filter(
         NotedTasks.id == task_id,
         NotedTasks.account_id == curr_user["user_id"]
@@ -220,19 +253,26 @@ def delete_task(task_id: int, request: Request, write_db: Session = Depends(get_
         raise HTTPException(status_code=404, detail="Desired task is not found!");
     write_db.delete(task);
     write_db.commit();
+    await cache.delete("user:tasks:{}".format(current_user_data["user_id"]));
     return {"status": "deleted"}
 
 
 @app.post("/api/users/login")
-def login(payload: LoginRequest, db: Session = Depends(get_readDB)):
+async def login(payload: LoginRequest, db: Session = Depends(get_readDB), cache: CacheService = Depends(get_cache)):
     existing_user = db.query(UserDB).filter(UserDB.username == payload.username).first();
     if not existing_user:
         raise HTTPException(
             status_code=404, detail="User not found"
         );
     if existing_user.password != payload.password:
-        raise HTTException(status_code=401, detail="Wrong password!");
+        raise HTTPException(status_code=401, detail="Wrong password!");
 
+    user_data = {
+        "username": existing_user.username,
+        "user_id": existing_user.id
+    };
+
+    user = await cache.set(f"user:account:{existing_user.username}", user_data, 666);
     response = RedirectResponse(
         url="/", status_code=status.HTTP_303_SEE_OTHER
     );
@@ -264,18 +304,21 @@ def signup(payload: SignupRequest, db: Session = Depends(get_writeDB)):
     return {"message": "Created a new account!", "userID": new_user.id};
 
 @app.get("/api/users/me")
-def get_current_user(request: Request, db: Session = Depends(get_db)):
+async def get_current_user(request: Request, db: Session = Depends(get_db), cache: CacheService = Depends(get_cache)):
     username = request.cookies.get("username");
     if not username:
         raise HTTPException(status_code=401, detail="Not authenticated");
-    user = db.query(UserDB).filter(UserDB.username == username).first();
+    async def query_userData_manually():
+        user = db.query(UserDB).filter(UserDB.username == username).first();
+        return {
+            "username": user.username,
+            "user_id": user.id
+        };
+    
+    user = cache.remember("user:account:{}".format(username), 666, query_userData_manually);    
     if not user:
         raise HTTPException(status_code=404, detail="User not found!");
-    return {
-        "username": user.username,
-        "firstname": user.firstname,
-        "lastname": user.lastname
-    };
+    return user;
 
 @app.post("/api/users/logout")
 def logout():
