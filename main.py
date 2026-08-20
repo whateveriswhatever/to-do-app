@@ -64,8 +64,6 @@ class NotedTasks(Base):
 
 Base.metadata.create_all(bind=engine);
 
-FastAPIRedis(app).lifespan();
-
 # Dependency to get DB session
 def get_db():
     db = SessionLocal();
@@ -95,7 +93,8 @@ async def get_redis() -> Redis:
 async def get_cache(redis: Redis = Depends(get_redis)) -> CacheService:
     return CacheService(redis);
 
-app = FastAPI()
+app = FastAPI();
+FastAPIRedis(app).lifespan();
 
 clone_user_accs = {
     "users": [
