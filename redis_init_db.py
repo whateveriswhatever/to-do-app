@@ -19,7 +19,7 @@ class RedisClient:
         if self.client:
             await self.client.aclose();
         if self.pool:
-            await self.pool aclose();
+            await self.pool.disconnect();
     
     def get_client(self) -> Redis:
         return self.client;
