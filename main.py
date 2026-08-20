@@ -187,7 +187,7 @@ def serve_signup():
 # Mount static directory to /static so assets (e.g., /static/style.css) bypass auth cleanly
 app.mount("/static", StaticFiles(directory="static"), name="static")
 
-async def get_current_user_data(request: Request, db: Session, cache: CacheService = Depends(get_cache)):
+async def get_current_user_data(request: Request, db: Session = Depends(get_readDB), cache: CacheService = Depends(get_cache)):
     username = request.cookies.get("username");
     if not username or username == '':
         raise HTTPException(status_code=401, detail="Not authenticated");
@@ -248,7 +248,7 @@ async def create_task(
 async def delete_task(task_id: int, request: Request, write_db: Session = Depends(get_writeDB), read_db: Session = Depends(get_readDB), curr_user_data: dict = Depends(get_current_user_data), cache: CacheService = Depends(get_cache)):
     task = write_db.query(NotedTasks).filter(
         NotedTasks.id == task_id,
-        NotedTasks.account_id == curr_user["user_id"]
+        NotedTasks.account_id == curr_user_data["user_id"]
     ).first();
     if not task:
         raise HTTPException(status_code=404, detail="Desired task is not found!");
@@ -316,7 +316,7 @@ async def get_current_user(request: Request, db: Session = Depends(get_db), cach
             "user_id": user.id
         };
     
-    user = cache.remember("user:account:{}".format(username), 666, query_userData_manually);    
+    user = await cache.remember("user:account:{}".format(username), 666, query_userData_manually);    
     if not user:
         raise HTTPException(status_code=404, detail="User not found!");
     return user;
