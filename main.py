@@ -10,7 +10,7 @@ import os
 import random
 from dotenv import load_dotenv
 from redis_fastapi import FastAPIRedis, AsyncRedisDep
-from redis_init_db import redis_client
+from redis_init_db import redis_client, lifespan
 from redis_cache import CacheService
 from redis.asyncio import Redis, ConnectionPool;
 
@@ -94,8 +94,7 @@ async def get_redis() -> Redis:
 async def get_cache(redis: Redis = Depends(get_redis)) -> CacheService:
     return CacheService(redis);
 
-app = FastAPI();
-FastAPIRedis(app).lifespan();
+app = FastAPI(lifespan=lifespan);
 router = APIRouter();
 
 clone_user_accs = {
@@ -254,7 +253,7 @@ async def delete_task(task_id: int, request: Request, write_db: Session = Depend
         raise HTTPException(status_code=404, detail="Desired task is not found!");
     write_db.delete(task);
     write_db.commit();
-    await cache.delete("user:tasks:{}".format(current_user_data["user_id"]));
+    await cache.delete("user:tasks:{}".format(curr_user_data["user_id"]));
     return {"status": "deleted"}
 
 
