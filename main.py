@@ -12,6 +12,7 @@ from dotenv import load_dotenv
 from redis_fastapi import FastAPIRedis, AsyncRedisDep
 from redis_init_db import redis_client
 from redis_cache import CacheService
+from redis.asyncio import Redis, ConnectionPool;
 
 load_dotenv();
 
