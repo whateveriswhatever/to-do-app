@@ -1,5 +1,5 @@
 from typing import List
-from fastapi import FastAPI, HTTPException, Request, status, Depends, Cookie
+from fastapi import FastAPI, HTTPException, Request, status, Depends, Cookie, APIRouter
 from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel
@@ -96,6 +96,7 @@ async def get_cache(redis: Redis = Depends(get_redis)) -> CacheService:
 
 app = FastAPI();
 FastAPIRedis(app).lifespan();
+router = APIRouter();
 
 clone_user_accs = {
     "users": [
